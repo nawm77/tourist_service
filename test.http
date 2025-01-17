@@ -1,0 +1,60 @@
+### Create a new tourist
+
+POST http://localhost:8080/api/v1/tourist
+Content-Type: application/json
+
+{
+  "name": "John",
+  "surname": "Doe",
+  "email": "john.doe@example.com",
+  "phoneNumber": "+1234567890",
+  "address": "123 Main Street",
+  "country": "Germany"
+}
+
+###
+
+### Get all tourists
+GET http://localhost:8080/api/v1/tourist/all
+
+###
+
+### Get tourist by ID
+GET http://localhost:8080/api/v1/tourist/678aa471a2f7ae20c94a55b9
+# Replace {id} with the actual ID of the tourist you want to retrieve
+
+###
+
+### Get tourist by email
+GET http://localhost:8080/api/v1/tourist/email/john.doe@example.com
+
+###
+
+### Get tourist by phone number
+GET http://localhost:8080/api/v1/tourist/phone/+1234567890
+
+###
+
+### Get tourists by name and surname
+GET http://localhost:8080/api/v1/tourist/name/John/surname/Doe
+
+###
+
+### Update tourist by ID
+PUT http://localhost:8080/api/v1/tourist/678aa471a2f7ae20c94a55b9
+Content-Type: application/json
+
+{
+  "name": "John",
+  "surname": "Smith",
+  "email": "john.smith@example.com",
+  "phoneNumber": "+1234567890",
+  "country": "Russia"
+}
+### Replace {id} with the actual ID of the tourist you want to update
+
+###
+
+### Delete tourist by ID
+DELETE http://localhost:8080/api/v1/tourist/678aa471a2f7ae20c94a55b9
+# Replace {id} with the actual ID of the tourist you want to delete
