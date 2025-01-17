@@ -7,9 +7,9 @@ scrape_configs:
     scrape_interval: 5s
     metrics_path: '/actuator/prometheus'
     static_configs:
-      - targets: ['tourist-backend:8085']
+      - targets: ['backend:8083']
   - job_name: 'prometheus-gateway'
     scrape_interval: 5s
     metrics_path: '/actuator/prometheus'
     static_configs:
-      - targets: [ 'tourist-gateway:8080' ]
+      - targets: [ 'gateway:8080' ]

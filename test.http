@@ -41,7 +41,7 @@ GET http://localhost:8080/api/v1/tourist/name/John/surname/Doe
 ###
 
 ### Update tourist by ID
-PUT http://localhost:8080/api/v1/tourist/678aa471a2f7ae20c94a55b9
+PUT http://localhost:8080/api/v1/tourist/678ab5981cbedb6958494afb
 Content-Type: application/json
 
 {
@@ -56,5 +56,5 @@ Content-Type: application/json
 ###
 
 ### Delete tourist by ID
-DELETE http://localhost:8080/api/v1/tourist/678aa471a2f7ae20c94a55b9
+DELETE http://localhost:8080/api/v1/tourist/678ab5981cbedb6958494afb
 # Replace {id} with the actual ID of the tourist you want to delete

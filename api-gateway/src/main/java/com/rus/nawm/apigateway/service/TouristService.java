@@ -11,6 +11,9 @@ import org.modelmapper.ModelMapper;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.stereotype.Service;
@@ -31,10 +34,12 @@ public class TouristService {
   private TouristServiceGrpc.TouristServiceBlockingStub touristServiceGrpc;
 
   private final RabbitTemplate rabbitTemplate;
+  private final CacheManager cacheManager;
 
   @Autowired
-  public TouristService(RabbitTemplate rabbitTemplate) {
+  public TouristService(RabbitTemplate rabbitTemplate, CacheManager cacheManager) {
     this.rabbitTemplate = rabbitTemplate;
+    this.cacheManager = cacheManager;
   }
 
   @Cacheable(REDIS_ALL_TOURISTS_CACHE_KEY)
@@ -71,25 +76,27 @@ public class TouristService {
     return modelMapper.map(tourist, TouristResponseDTO.class);
   }
 
-  @Cacheable(value = REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY, key = "#name + '-' + #surname")
-  public List<TouristResponseDTO> getTouristsByNameAndSurname(String name, String surname) {
-    log.info("Fetching tourists by name and surname from gRPC service: {} {}", name, surname);
-    var request = TouristServiceOuterClass.GetTouristsByNameAndSurnameRequest.newBuilder()
-            .setName(name)
-            .setSurname(surname)
-            .build();
-    var response = touristServiceGrpc.getTouristsByNameAndSurname(request);
-    return response.getTouristsList()
-            .stream()
-            .map(tourist -> modelMapper.map(tourist, TouristResponseDTO.class))
-            .collect(Collectors.toList());
-  }
+//  @Cacheable(value = REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY, key = "#name + '-' + #surname")
+//  public List<TouristResponseDTO> getTouristsByNameAndSurname(String name, String surname) {
+//    log.info("Fetching tourists by name and surname from gRPC service: {} {}", name, surname);
+//    var request = TouristServiceOuterClass.GetTouristsByNameAndSurnameRequest.newBuilder()
+//            .setName(name)
+//            .setSurname(surname)
+//            .build();
+//    var response = touristServiceGrpc.getTouristsByNameAndSurname(request);
+//    return response.getTouristsList()
+//            .stream()
+//            .map(tourist -> modelMapper.map(tourist, TouristResponseDTO.class))
+//            .collect(Collectors.toList());
+//  }
 
   public void saveNewTourist(TouristRequestDTO touristRequestDTO) throws Exception {
     try {
       log.info("Sending new tourist creation request: {}", touristRequestDTO);
       rabbitTemplate.convertAndSend(RabbitMQConfig.directExchangeName, RabbitMQConfig.touristPostRequestQueueRoutingKey, touristRequestDTO);
       log.info("Tourist creation request successfully sent to RabbitMQ");
+      TouristResponseDTO touristResponseDTO = modelMapper.map(touristRequestDTO, TouristResponseDTO.class);
+      onSaveMethod(touristResponseDTO);
     } catch (AmqpException e) {
       log.error("Error while sending message to RabbitMQ", e);
       throw e;
@@ -99,11 +106,41 @@ public class TouristService {
     }
   }
 
+  private void onSaveMethod(TouristResponseDTO touristResponseDTO) {
+    Cache cacheByEmail = cacheManager.getCache(REDIS_TOURIST_BY_EMAIL_CACHE_KEY);
+    Cache cacheByPhone = cacheManager.getCache(REDIS_TOURIST_BY_PHONE_CACHE_KEY);
+    if (cacheByEmail != null) {
+      log.info("Saving tourist in cache by email: {}", touristResponseDTO.getEmail());
+      cacheByEmail.put(touristResponseDTO.getEmail(), touristResponseDTO);
+    } else {
+      log.warn("Cache not found for email: {}", REDIS_TOURIST_BY_EMAIL_CACHE_KEY);
+    }
+    if (cacheByPhone != null) {
+      log.info("Saving tourist in cache by phone: {}", touristResponseDTO.getPhoneNumber());
+      cacheByPhone.put(touristResponseDTO.getPhoneNumber(), touristResponseDTO);
+    } else {
+      log.warn("Cache not found for phone: {}", REDIS_TOURIST_BY_PHONE_CACHE_KEY);
+    }
+  }
+
+  private void onDeleteMethod(String id) {
+    Cache cacheById = cacheManager.getCache(REDIS_TOURIST_BY_ID_CACHE_KEY);
+    if (cacheById != null) {
+      log.info("Deleting tourist from cache by ID: {}", id);
+      cacheById.evictIfPresent(id);
+    } else {
+      log.warn("Cache not found for ID: {}", REDIS_TOURIST_BY_ID_CACHE_KEY);
+    }
+  }
+
+  //todo проверить что кеш меняется при обновлении
   public void updateTourist(String id, TouristRequestDTO touristRequestDTO) throws Exception {
     try {
       log.info("Sending update request for tourist with ID: {} and data: {}", id, touristRequestDTO);
       rabbitTemplate.convertAndSend(RabbitMQConfig.directExchangeName, RabbitMQConfig.touristPutRequestQueueRoutingKey, touristRequestDTO);
       log.info("Tourist update request successfully sent to RabbitMQ");
+      TouristResponseDTO touristResponseDTO = modelMapper.map(touristRequestDTO, TouristResponseDTO.class);
+      onSaveMethod(touristResponseDTO);
     } catch (AmqpException e) {
       log.error("Error while sending update request for tourist with ID: {}", id, e);
       throw e;
@@ -120,6 +157,7 @@ public class TouristService {
     try {
       log.info("Sending delete request for tourist with ID: {}", id);
       rabbitTemplate.convertAndSend(RabbitMQConfig.directExchangeName, RabbitMQConfig.touristDeleteRequestQueueRoutingKey, id);
+      onDeleteMethod(id);
       log.info("Tourist delete request successfully sent to RabbitMQ");
     } catch (AmqpException e) {
       log.error("Error while sending delete request for tourist with ID: {}", id, e);
