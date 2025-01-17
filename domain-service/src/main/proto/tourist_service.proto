@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package com.rus.nawm.apigateway;
+
+service TouristService {
+  rpc GetTouristByEmail (GetTouristsByEmailRequest) returns (Tourist);
+  rpc GetTouristByPhoneNumber (GetTouristsByPhoneRequest) returns (Tourist);
+  rpc GetTouristById (GetTouristByIdRequest) returns (Tourist);
+  rpc GetTouristsByNameAndSurname (GetTouristsByNameAndSurnameRequest) returns (GetTouristsResponse);
+  rpc GetAllTourists (Empty) returns (GetTouristsResponse);
+}
+
+message GetTouristByIdRequest {
+  string id = 1;
+}
+
+message GetTouristsByEmailRequest {
+  string email = 1;
+}
+
+message GetTouristsByPhoneRequest {
+  string phoneNumber = 1;
+}
+
+message GetTouristsByNameAndSurnameRequest {
+  string name = 1;
+  string surname = 2;
+}
+
+message Tourist {
+  string id = 1;
+  string name = 2;
+  string surname = 3;
+  string email = 4;
+  string phoneNumber = 5;
+  string country = 6;
+}
+
+message GetTouristsResponse {
+  repeated Tourist tourists = 1;
+}
+
+message Empty {}

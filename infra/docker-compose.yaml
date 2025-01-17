@@ -1,0 +1,30 @@
+version: '3.8'
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - '27017:27017'
+
+  mongo-express:
+    image: mongo-express
+    container_name: mongo_express
+    ports:
+      - '8081:8081'
+    environment:
+      ME_CONFIG_MONGODB_PORT: 27017
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+#  sharing:
+#    image: bike-sharing-mongo:0.2.0
+#    build:
+#      context: .
+#    container_name: sharing-mongo
+#    ports:
+#      - '8080:8080'
+#    environment:
+#      SPRING_DATA_MONGODB_DATABASE: bikeService
+#      SPRING_DATA_MONGODB_PORT: 27017
+#      SPRING_DATA_MONGODB_HOST: mongodb
+#      SPRING_DATA_MONGODB_AUTO-INDEX-CREATION: true

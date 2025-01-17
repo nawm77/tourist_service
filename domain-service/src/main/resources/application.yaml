@@ -1,0 +1,10 @@
+spring:
+  data:
+    mongodb:
+      database: touristService
+      port: 27017
+      host: localhost
+      auto-index-creation: true
+grpc:
+  server:
+    port: 9090
