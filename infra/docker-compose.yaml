@@ -85,6 +85,22 @@ services:
     ports:
       - "6379:6379"
 
+  rabbitmq:
+    image: rabbitmq:latest
+    container_name: rabbit_tourist
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Moscow
+      RABBITMQ_DEFAULT_USER: rabbit
+      RABBITMQ_DEFAULT_PASS: 1234
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - ./rabbitmq:/var/lib/rabbitmq
+      - ./rabbitmq/init.sh:/var/init.sh
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
 #  backend:
 #    container_name: tourist-backend
 #    image: tourist-backend

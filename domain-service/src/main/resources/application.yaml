@@ -5,6 +5,11 @@ spring:
       port: 27017
       host: localhost
       auto-index-creation: true
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: rabbit
+    password: 1234
 grpc:
   server:
     port: 8090

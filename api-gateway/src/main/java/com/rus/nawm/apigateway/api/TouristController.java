@@ -1,5 +1,6 @@
 package com.rus.nawm.apigateway.api;
 
+import com.rus.nawm.apigateway.api.dto.TouristRequestDTO;
 import com.rus.nawm.apigateway.api.dto.TouristResponseDTO;
 import com.rus.nawm.apigateway.service.TouristService;
 import lombok.RequiredArgsConstructor;
@@ -55,5 +56,48 @@ public class TouristController {
     List<TouristResponseDTO> tourists = touristService.getTouristsByNameAndSurname(name, surname);
     log.info("Returning {} tourists", tourists.size());
     return ResponseEntity.ok(tourists);
+  }
+
+  @PostMapping
+  public ResponseEntity<?> createNewTourist(@RequestBody TouristRequestDTO touristRequestDTO) {
+    log.info("Received request to create new tourist: {}", touristRequestDTO);
+    try {
+      touristService.saveNewTourist(touristRequestDTO);
+      log.info("Tourist successfully created: {}", touristRequestDTO);
+      return ResponseEntity.ok("Created");
+    } catch (Exception e) {
+      log.error("Error occurred while creating new tourist: {}", touristRequestDTO, e);
+      return ResponseEntity.status(500).body(e.getLocalizedMessage());
+    }
+  }
+
+  @PutMapping("/{id}")
+  public ResponseEntity<?> updateTourist(@PathVariable String id, @RequestBody TouristRequestDTO touristRequestDTO) {
+    if(touristRequestDTO.getId() == null) {
+      touristRequestDTO.setId(id);
+    }
+    log.info("Received request to update tourist with ID: {} and data: {}", id, touristRequestDTO);
+    try {
+      touristService.updateTourist(id, touristRequestDTO);
+      log.info("Tourist with ID {} successfully updated.", id);
+      return ResponseEntity.ok("Updated");
+    } catch (Exception e) {
+      log.error("Error occurred while updating tourist with ID {}: {}", id, touristRequestDTO, e);
+      return ResponseEntity.status(500).body(e.getLocalizedMessage());
+    }
+  }
+
+  @DeleteMapping("/{id}")
+  public ResponseEntity<?> deleteTourist(@PathVariable String id) {
+
+    log.info("Received request to delete tourist with ID: {}", id);
+    try {
+      touristService.deleteTourist(id);
+      log.info("Tourist with ID {} successfully deleted.", id);
+      return ResponseEntity.ok("Deleted");
+    } catch (Exception e) {
+      log.error("Error occurred while deleting tourist with ID {}: {}", id, e.getMessage(), e);
+      return ResponseEntity.status(500).body(e.getLocalizedMessage());
+    }
   }
 }

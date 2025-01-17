@@ -2,11 +2,15 @@ package com.rus.nawm.apigateway.service;
 
 import com.rus.nawm.apigateway.TouristServiceGrpc;
 import com.rus.nawm.apigateway.TouristServiceOuterClass;
+import com.rus.nawm.apigateway.api.dto.TouristRequestDTO;
 import com.rus.nawm.apigateway.api.dto.TouristResponseDTO;
-import com.rus.nawm.apigateway.config.RedisConfig;
+import com.rus.nawm.apigateway.config.RabbitMQConfig;
 import lombok.extern.log4j.Log4j2;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.modelmapper.ModelMapper;
+import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.stereotype.Service;
@@ -25,6 +29,13 @@ public class TouristService {
 
   @GrpcClient("touristService")
   private TouristServiceGrpc.TouristServiceBlockingStub touristServiceGrpc;
+
+  private final RabbitTemplate rabbitTemplate;
+
+  @Autowired
+  public TouristService(RabbitTemplate rabbitTemplate) {
+    this.rabbitTemplate = rabbitTemplate;
+  }
 
   @Cacheable(REDIS_ALL_TOURISTS_CACHE_KEY)
   public List<TouristResponseDTO> getAllTourists() {
@@ -72,5 +83,53 @@ public class TouristService {
             .stream()
             .map(tourist -> modelMapper.map(tourist, TouristResponseDTO.class))
             .collect(Collectors.toList());
+  }
+
+  public void saveNewTourist(TouristRequestDTO touristRequestDTO) throws Exception {
+    try {
+      log.info("Sending new tourist creation request: {}", touristRequestDTO);
+      rabbitTemplate.convertAndSend(RabbitMQConfig.directExchangeName, RabbitMQConfig.touristPostRequestQueueRoutingKey, touristRequestDTO);
+      log.info("Tourist creation request successfully sent to RabbitMQ");
+    } catch (AmqpException e) {
+      log.error("Error while sending message to RabbitMQ", e);
+      throw e;
+    } catch (IllegalArgumentException e) {
+      log.error("Invalid tourist data: {}", touristRequestDTO, e);
+      throw e;
+    }
+  }
+
+  public void updateTourist(String id, TouristRequestDTO touristRequestDTO) throws Exception {
+    try {
+      log.info("Sending update request for tourist with ID: {} and data: {}", id, touristRequestDTO);
+      rabbitTemplate.convertAndSend(RabbitMQConfig.directExchangeName, RabbitMQConfig.touristPutRequestQueueRoutingKey, touristRequestDTO);
+      log.info("Tourist update request successfully sent to RabbitMQ");
+    } catch (AmqpException e) {
+      log.error("Error while sending update request for tourist with ID: {}", id, e);
+      throw e;
+    } catch (IllegalArgumentException e) {
+      log.error("Invalid tourist data for ID: {}: {}", id, touristRequestDTO, e);
+      throw e;
+    } catch (Exception e) {
+      log.error("Unexpected error while updating tourist with ID: {}", id, e);
+      throw e;
+    }
+  }
+
+  public void deleteTourist(String id) throws Exception {
+    try {
+      log.info("Sending delete request for tourist with ID: {}", id);
+      rabbitTemplate.convertAndSend(RabbitMQConfig.directExchangeName, RabbitMQConfig.touristDeleteRequestQueueRoutingKey, id);
+      log.info("Tourist delete request successfully sent to RabbitMQ");
+    } catch (AmqpException e) {
+      log.error("Error while sending delete request for tourist with ID: {}", id, e);
+      throw e;
+    } catch (IllegalArgumentException e) {
+      log.error("Invalid tourist ID for deletion: {}", id, e);
+      throw e;
+    } catch (Exception e) {
+      log.error("Unexpected error while deleting tourist with ID: {}", id, e);
+      throw e;
+    }
   }
 }
