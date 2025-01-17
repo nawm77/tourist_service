@@ -3,14 +3,12 @@ package com.rus.nawm.domain.domainservice.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.DuplicateKeyException;
 import com.mongodb.MongoWriteException;
+import com.rus.nawm.domain.domainservice.domain.Tourist;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.support.ListenerExecutionFailedException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import com.rus.nawm.domain.domainservice.domain.Tourist;
-
-import java.io.IOException;
 
 import static com.rus.nawm.domain.domainservice.config.RabbitMQConfig.*;
 
