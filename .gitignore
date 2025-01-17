@@ -32,6 +32,6 @@ build/
 ### VS Code ###
 .vscode/
 
-/infra/rabbitmq/mnesia
-/domain-service/target
-/api-gateway/target
+./infra/rabbitmq/mnesia
+./domain-service/target
+./api-gateway/target
