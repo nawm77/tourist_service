@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+rule_files:
+scrape_configs:
+  - job_name: 'prometheus-backend'
+    scrape_interval: 5s
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['tourist-backend:8085']
+  - job_name: 'prometheus-gateway'
+    scrape_interval: 5s
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'tourist-gateway:8080' ]

@@ -19,6 +19,7 @@
         <grpc.version>1.53.0</grpc.version>
         <protobuf-plugin.version>0.6.1</protobuf-plugin.version>
         <os.detected.classifier>osx-aarch_64</os.detected.classifier>
+<!--        <os.detected.classifier>linux-x86_64</os.detected.classifier>-->
     </properties>
     <dependencies>
         <dependency>
@@ -62,6 +63,31 @@
             <groupId>org.modelmapper</groupId>
             <artifactId>modelmapper</artifactId>
             <version>3.1.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+            <version>3.3.3</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
     </dependencies>
 
@@ -126,6 +152,7 @@
                 </executions>
             </plugin>
         </plugins>
+        <finalName>tourist-api-gateway</finalName>
     </build>
 
 </project>
