@@ -35,9 +35,8 @@ services:
       - "${GRAFANA_CONTAINER_PORT}:${GRAFANA_PORT}"
     depends_on:
       - prometheus
-#    volumes:
-#      - ./grafana/dashboard.yml:/etc/grafana/provisioning/dashboards/main.yml
-#      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    volumes:
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
 
   elasticsearch:
     image: elasticsearch:8.7.0
@@ -96,7 +95,6 @@ services:
     ports:
       - "${RABBITMQ_CONTAINER_PORT}:${RABBITMQ_PORT}"
       - "${RABBITMQ_MANAGEMENT_CONTAINER_PORT}:${RABBITMQ_MANAGEMENT_PORT}"
-
   backend:
     container_name: ${BACKEND_CONTAINER_NAME}
     image: nawm77/tourist-backend:1.3
