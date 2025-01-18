@@ -27,3 +27,6 @@ management:
     metrics:
       export:
         enabled: true
+logstash:
+  host: localhost
+  port: 6000

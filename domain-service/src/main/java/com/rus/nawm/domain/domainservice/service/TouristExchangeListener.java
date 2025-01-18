@@ -6,6 +6,7 @@ import com.mongodb.MongoWriteException;
 import com.rus.nawm.domain.domainservice.domain.Tourist;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.support.ListenerExecutionFailedException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -18,18 +19,21 @@ public class TouristExchangeListener {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   private final TouristService touristService;
+  private final RabbitTemplate rabbitTemplate;
 
   @Autowired
-  public TouristExchangeListener(TouristService touristService) {
+  public TouristExchangeListener(TouristService touristService, RabbitTemplate rabbitTemplate) {
     this.touristService = touristService;
+    this.rabbitTemplate = rabbitTemplate;
   }
 
   @RabbitListener(queues = {touristPostRequestQueueName})
   public void onPostMethod(Tourist tourist) {
     try {
       log.info("Received and deserialized tourist object for POST: {}", tourist);
-      touristService.save(tourist);
-    } catch (ListenerExecutionFailedException | MongoWriteException | DuplicateKeyException e) {
+      tourist = touristService.save(tourist);
+      rabbitTemplate.convertAndSend(directExchangeName, touristPostResponseQueueRoutingKey, tourist);
+    } catch (Exception e) {
       log.error("Error saving tourist object: {}", tourist, e);
     }
   }
@@ -38,7 +42,8 @@ public class TouristExchangeListener {
   public void onPutMethod(Tourist tourist) {
     try {
       log.info("Received and deserialized tourist object for PUT: {}", tourist);
-      touristService.updateTourist(tourist);
+      tourist = touristService.updateTourist(tourist);
+      rabbitTemplate.convertAndSend(directExchangeName, touristPutResponseQueueRoutingKey, tourist);
     } catch (ListenerExecutionFailedException | MongoWriteException | DuplicateKeyException e) {
       log.error("Error saving tourist object: {}", tourist, e);
     } catch (Exception e) {
@@ -50,5 +55,6 @@ public class TouristExchangeListener {
   public void onDeleteMethod(String touristId) {
     log.info("Received tourist id for DELETE: {}", touristId);
     touristService.deleteTourist(touristId);
+    rabbitTemplate.convertAndSend(directExchangeName, touristDeleteResponseQueueRoutingKey, touristId);
   }
 }

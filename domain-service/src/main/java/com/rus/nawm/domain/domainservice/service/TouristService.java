@@ -29,16 +29,15 @@ public class TouristService {
     }
   }
 
-  public void save(Tourist tourist) throws MongoWriteException {
+  public Tourist save(Tourist tourist) throws MongoWriteException {
     log.info("Saving tourist: {}", tourist);
     try {
       Tourist savedTourist = touristRepository.save(tourist);
       log.info("Tourist successfully saved: {}", savedTourist);
+      return savedTourist;
     } catch (MongoWriteException | DuplicateKeyException e) {
       log.error("Error while saving tourist: {}", tourist, e);
       throw e;
-    } catch (Exception e) {
-      log.error("Error while saving tourist: {}", tourist, e);
     }
   }
 
@@ -75,13 +74,15 @@ public class TouristService {
     return tourist;
   }
 
-  public void updateTourist(Tourist tourist) {
+  public Tourist updateTourist(Tourist tourist) {
     log.info("Updating tourist: {}", tourist);
     try {
       Tourist updatedTourist = touristRepository.save(tourist);
       log.info("Tourist successfully updated: {}", updatedTourist);
+      return updatedTourist;
     } catch (Exception e) {
       log.error("Error while updating tourist: {}", tourist, e);
+      throw e;
     }
   }
 

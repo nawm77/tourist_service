@@ -1,8 +1,10 @@
 package com.rus.nawm.apigateway.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Scope;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
@@ -13,6 +15,7 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 import java.time.Duration;
 
 @Configuration
+@EnableCaching
 public class RedisConfig {
   @Value("${redis.host}")
   private String redisHost;
@@ -31,10 +34,11 @@ public class RedisConfig {
     return new LettuceConnectionFactory(configuration);
   }
 
-  @Bean
+  @Bean("myCacheManager")
+  @Scope("singleton")
   public RedisCacheManager cacheManager() {
     RedisCacheConfiguration cacheConfig = myDefaultCacheConfig(Duration.ofMinutes(10)).disableCachingNullValues();
-    return RedisCacheManager.builder(redisConnectionFactory())
+    RedisCacheManager manager = RedisCacheManager.builder(redisConnectionFactory())
             .cacheDefaults(cacheConfig)
             .withCacheConfiguration(REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY, myDefaultCacheConfig(Duration.ofMinutes(10)))
             .withCacheConfiguration(REDIS_TOURIST_BY_PHONE_CACHE_KEY, myDefaultCacheConfig(Duration.ofMinutes(10)))
@@ -42,6 +46,7 @@ public class RedisConfig {
             .withCacheConfiguration(REDIS_TOURIST_BY_ID_CACHE_KEY, myDefaultCacheConfig(Duration.ofMinutes(10)))
             .withCacheConfiguration(REDIS_ALL_TOURISTS_CACHE_KEY, myDefaultCacheConfig(Duration.ofMinutes(10)))
             .build();
+    return manager;
   }
 
   private RedisCacheConfiguration myDefaultCacheConfig(Duration duration) {

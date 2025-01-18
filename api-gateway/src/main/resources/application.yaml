@@ -26,3 +26,6 @@ spring:
 redis:
   host: localhost
   port: 6379
+logstash:
+  host: localhost
+  port: 6000
