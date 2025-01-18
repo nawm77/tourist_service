@@ -37,6 +37,7 @@ services:
       - prometheus
     volumes:
       - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ./grafana/dashboard.yml:/etc/grafana/provisioning/dashboards/main.yml
 
   elasticsearch:
     image: elasticsearch:8.7.0
