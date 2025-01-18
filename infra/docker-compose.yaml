@@ -103,8 +103,8 @@ services:
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:${BACKEND_PORT}/actuator/health" ]
       interval: 20s
-      timeout: 20s
-      retries: 5
+      timeout: 50s
+      retries: 10
     ports:
       - "${BACKEND_CONTAINER_PORT}:${BACKEND_PORT}"
     depends_on:
@@ -134,8 +134,8 @@ services:
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:${GATEWAY_PORT}/actuator/health" ]
       interval: 20s
-      timeout: 20s
-      retries: 5
+      timeout: 50s
+      retries: 10
     ports:
       - "${GATEWAY_CONTAINER_PORT}:${GATEWAY_PORT}"
     depends_on:
