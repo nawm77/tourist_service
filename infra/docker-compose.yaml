@@ -95,6 +95,8 @@ services:
     ports:
       - "${RABBITMQ_CONTAINER_PORT}:${RABBITMQ_PORT}"
       - "${RABBITMQ_MANAGEMENT_CONTAINER_PORT}:${RABBITMQ_MANAGEMENT_PORT}"
+    volumes:
+      - ./rabbitmq/init.sh:/var/init.sh
   backend:
     container_name: ${BACKEND_CONTAINER_NAME}
     image: nawm77/tourist-backend:1.3
