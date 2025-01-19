@@ -108,6 +108,7 @@ services:
       interval: 20s
       timeout: 50s
       retries: 10
+      start_period: 40s
     ports:
       - "${BACKEND_CONTAINER_PORT}:${BACKEND_PORT}"
     depends_on:
@@ -139,6 +140,7 @@ services:
       interval: 20s
       timeout: 50s
       retries: 10
+      start_period: 40s
     ports:
       - "${GATEWAY_CONTAINER_PORT}:${GATEWAY_PORT}"
     depends_on:
