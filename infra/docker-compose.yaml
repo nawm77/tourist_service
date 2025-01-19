@@ -100,7 +100,7 @@ services:
       - ./rabbitmq/init.sh:/var/init.sh
   backend:
     container_name: ${BACKEND_CONTAINER_NAME}
-    image: nawm77/tourist-backend:1.4
+    image: nawm77/tourist-backend:1.5
     build:
       context: ../domain-service
     healthcheck:
@@ -131,7 +131,7 @@ services:
 
   gateway:
     container_name: ${GATEWAY_CONTAINER_NAME}
-    image: nawm77/tourist-gateway:1.4
+    image: nawm77/tourist-gateway:1.5
     build:
       context: ../api-gateway
     healthcheck:
