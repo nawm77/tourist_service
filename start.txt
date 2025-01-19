@@ -1,1 +1,2 @@
 grafana dahsboard - 19004
+rabbit init.sh
