@@ -1,5 +1,6 @@
 package com.rus.nawm.apigateway.service;
 
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.rus.nawm.apigateway.TouristServiceGrpc;
 import com.rus.nawm.apigateway.TouristServiceOuterClass;
 import com.rus.nawm.apigateway.api.dto.TouristRequestDTO;
@@ -9,96 +10,152 @@ import lombok.extern.log4j.Log4j2;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.modelmapper.ModelMapper;
 import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.Cache;
-import org.springframework.cache.annotation.CachePut;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.EnableCaching;
-import org.springframework.context.annotation.DependsOn;
-import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static com.rus.nawm.apigateway.config.RedisConfig.*;
 
 @Service
 @Log4j2
-@EnableCaching
-@DependsOn("myCacheManager")
+//@EnableCaching
 public class TouristService {
 
   private final ModelMapper modelMapper = new ModelMapper();
+  private final CacheManager cacheManager;
 
   @GrpcClient("touristService")
   private TouristServiceGrpc.TouristServiceBlockingStub touristServiceGrpc;
 
   private final RabbitTemplate rabbitTemplate;
-  private final RedisCacheManager redisCacheManager;
 
   @Autowired
-  public TouristService(RabbitTemplate rabbitTemplate, final @Qualifier("myCacheManager") RedisCacheManager cacheManager) {
+  public TouristService(CacheManager cacheManager1, RabbitTemplate rabbitTemplate) {
+    this.cacheManager = cacheManager1;
     this.rabbitTemplate = rabbitTemplate;
-    this.redisCacheManager = cacheManager;
-//    log.info("Cache manager is missing {}", this.redisCacheManager == null);
   }
 
-  @Cacheable(REDIS_ALL_TOURISTS_CACHE_KEY)
   public List<TouristResponseDTO> getAllTourists() {
-    log.info("Fetching all tourists from gRPC service");
-    var response = touristServiceGrpc.getAllTourists(TouristServiceOuterClass.Empty.newBuilder().build());
-    return response.getTouristsList()
-            .stream()
-            .map(tourist -> modelMapper.map(tourist, TouristResponseDTO.class))
-            .collect(Collectors.toList());
+    Cache cache = cacheManager.getCache(REDIS_ALL_TOURISTS_CACHE_KEY);
+    List<TouristResponseDTO> tourists = cache != null ? cache.get("allTourists", List.class) : null;
+
+    if (tourists == null) {
+      log.info("Fetching all tourists from gRPC service");
+      var response = touristServiceGrpc.getAllTourists(TouristServiceOuterClass.Empty.newBuilder().build());
+      tourists = response.getTouristsList()
+              .stream()
+              .map(tourist -> modelMapper.map(tourist, TouristResponseDTO.class))
+              .collect(Collectors.toList());
+
+      if (cache != null) {
+        cache.put("allTourists", tourists);
+      }
+    }
+
+    return tourists;
   }
 
-  @Cacheable(value = REDIS_TOURIST_BY_ID_CACHE_KEY, key = "#id")
   public TouristResponseDTO getTouristById(String id) {
-    log.info("Fetching tourist by ID from gRPC service: {}", id);
-    var request = TouristServiceOuterClass.GetTouristByIdRequest.newBuilder().setId(id).build();
-    var tourist = touristServiceGrpc.getTouristById(request);
-    return modelMapper.map(tourist, TouristResponseDTO.class);
+    Cache cache = cacheManager.getCache(REDIS_TOURIST_BY_ID_CACHE_KEY);
+    TouristResponseDTO tourist = cache != null ? cache.get(id, TouristResponseDTO.class) : null;
+
+    if (tourist == null) {
+      log.info("Fetching tourist by ID from gRPC service: {}", id);
+      var request = TouristServiceOuterClass.GetTouristByIdRequest.newBuilder().setId(id).build();
+      var response = touristServiceGrpc.getTouristById(request);
+      tourist = modelMapper.map(response, TouristResponseDTO.class);
+
+      if (cache != null) {
+        cache.put(id, tourist);
+      }
+    }
+
+    return tourist;
   }
 
-  @Cacheable(value = REDIS_TOURIST_BY_EMAIL_CACHE_KEY, key = "#email")
   public TouristResponseDTO getTouristByEmail(String email) {
-    log.info("Fetching tourist by email from gRPC service: {}", email);
-    var request = TouristServiceOuterClass.GetTouristsByEmailRequest.newBuilder().setEmail(email).build();
-    var tourist = touristServiceGrpc.getTouristByEmail(request);
-    return modelMapper.map(tourist, TouristResponseDTO.class);
+    Cache cache = cacheManager.getCache(REDIS_TOURIST_BY_EMAIL_CACHE_KEY);
+    TouristResponseDTO tourist = cache != null ? cache.get(email, TouristResponseDTO.class) : null;
+
+    if (tourist == null) {
+      log.info("Fetching tourist by email from gRPC service: {}", email);
+      var request = TouristServiceOuterClass.GetTouristsByEmailRequest.newBuilder().setEmail(email).build();
+      var response = touristServiceGrpc.getTouristByEmail(request);
+      tourist = modelMapper.map(response, TouristResponseDTO.class);
+
+      if (cache != null) {
+        cache.put(email, tourist);
+      }
+    }
+
+    return tourist;
   }
 
-  @Cacheable(value = REDIS_TOURIST_BY_PHONE_CACHE_KEY, key = "#phoneNumber")
   public TouristResponseDTO getTouristByPhoneNumber(String phoneNumber) {
-    log.info("Fetching tourist by phone number from gRPC service: {}", phoneNumber);
-    var request = TouristServiceOuterClass.GetTouristsByPhoneRequest.newBuilder().setPhoneNumber(phoneNumber).build();
-    var tourist = touristServiceGrpc.getTouristByPhoneNumber(request);
-    return modelMapper.map(tourist, TouristResponseDTO.class);
+    Cache cache = cacheManager.getCache(REDIS_TOURIST_BY_PHONE_CACHE_KEY);
+    TouristResponseDTO tourist = cache != null ? cache.get(phoneNumber, TouristResponseDTO.class) : null;
+
+    if (tourist == null) {
+      log.info("Fetching tourist by phone number from gRPC service: {}", phoneNumber);
+      var request = TouristServiceOuterClass.GetTouristsByPhoneRequest.newBuilder().setPhoneNumber(phoneNumber).build();
+      var response = touristServiceGrpc.getTouristByPhoneNumber(request);
+      tourist = modelMapper.map(response, TouristResponseDTO.class);
+
+      if (cache != null) {
+        cache.put(phoneNumber, tourist);
+      }
+    }
+
+    return tourist;
   }
 
-  @Cacheable(value = REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY, key = "#name + '-' + #surname")
   public List<TouristResponseDTO> getTouristsByNameAndSurname(String name, String surname) {
-    log.info("Fetching tourists by name and surname from gRPC service: {} {}", name, surname);
-    var request = TouristServiceOuterClass.GetTouristsByNameAndSurnameRequest.newBuilder()
-            .setName(name)
-            .setSurname(surname)
-            .build();
-    var response = touristServiceGrpc.getTouristsByNameAndSurname(request);
-    return response.getTouristsList()
-            .stream()
-            .map(tourist -> modelMapper.map(tourist, TouristResponseDTO.class))
-            .collect(Collectors.toList());
+    String cacheKey = name + "-" + surname;
+    Cache cache = cacheManager.getCache(REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY);
+    List<TouristResponseDTO> tourists = cache != null ? cache.get(cacheKey, List.class) : null;
+
+    if (tourists == null) {
+      log.info("Fetching tourists by name and surname from gRPC service: {} {}", name, surname);
+      var request = TouristServiceOuterClass.GetTouristsByNameAndSurnameRequest.newBuilder()
+              .setName(name)
+              .setSurname(surname)
+              .build();
+      var response = touristServiceGrpc.getTouristsByNameAndSurname(request);
+      tourists = response.getTouristsList()
+              .stream()
+              .map(tourist -> modelMapper.map(tourist, TouristResponseDTO.class))
+              .collect(Collectors.toList());
+
+      if (cache != null) {
+        cache.put(cacheKey, tourists);
+      }
+    }
+
+    return tourists;
   }
 
   public void saveNewTourist(TouristRequestDTO touristRequestDTO) throws Exception {
     try {
       log.info("Sending new tourist creation request: {}", touristRequestDTO);
-      rabbitTemplate.convertAndSend(RabbitMQConfig.directExchangeName, RabbitMQConfig.touristPostRequestQueueRoutingKey, touristRequestDTO);
+      TouristServiceOuterClass.Tourist touristProto = TouristServiceOuterClass.Tourist.newBuilder()
+              .setEmail(touristRequestDTO.getEmail())
+              .setCountry(touristRequestDTO.getCountry())
+              .setName(touristRequestDTO.getName())
+              .setSurname(touristRequestDTO.getSurname())
+              .setPhoneNumber(touristRequestDTO.getPhoneNumber())
+              .build();
+      Message message = toProtobufMessage(touristProto);
+      rabbitTemplate.convertAndSend(RabbitMQConfig.directExchangeName, RabbitMQConfig.touristPostRequestQueueRoutingKey, message);
       log.info("Tourist creation request successfully sent to RabbitMQ");
     } catch (AmqpException e) {
       log.error("Error while sending message to RabbitMQ", e);
@@ -109,150 +166,19 @@ public class TouristService {
     }
   }
 
-  private void onSaveMethod(TouristResponseDTO touristResponseDTO) {
-    if(this.redisCacheManager == null) {
-      log.info("Cache manager in method is null");
-    }
-    if(this.redisCacheManager != null) {
-      Cache cacheByEmail = redisCacheManager.getCache(REDIS_TOURIST_BY_EMAIL_CACHE_KEY);
-      Cache cacheByPhone = redisCacheManager.getCache(REDIS_TOURIST_BY_PHONE_CACHE_KEY);
-      Cache allTouristsCache = redisCacheManager.getCache(REDIS_ALL_TOURISTS_CACHE_KEY);
-      Cache cacheById = redisCacheManager.getCache(REDIS_TOURIST_BY_ID_CACHE_KEY);
-      Cache cacheByNameAndSurname = redisCacheManager.getCache(REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY);
-      if (cacheByEmail != null) {
-        log.info("Saving tourist in cache by email: {}", touristResponseDTO.getEmail());
-        cacheByEmail.put(touristResponseDTO.getEmail(), touristResponseDTO);
-      } else {
-        log.warn("Cache not found for email: {}", REDIS_TOURIST_BY_EMAIL_CACHE_KEY);
-      }
-      if (cacheByPhone != null) {
-        log.info("Saving tourist in cache by phone: {}", touristResponseDTO.getPhoneNumber());
-        cacheByPhone.put(touristResponseDTO.getPhoneNumber(), touristResponseDTO);
-      } else {
-        log.warn("Cache not found for phone: {}", REDIS_TOURIST_BY_PHONE_CACHE_KEY);
-      }
-      if (allTouristsCache != null) {
-        log.info("Saving tourist in all tourists cache");
-        List tourists = allTouristsCache.get(REDIS_ALL_TOURISTS_CACHE_KEY, List.class);
-        tourists.add(touristResponseDTO);
-        allTouristsCache.put(REDIS_ALL_TOURISTS_CACHE_KEY, tourists);
-      } else {
-        log.warn("Cache not found for all tourists: {}", REDIS_ALL_TOURISTS_CACHE_KEY);
-      }
-      if (cacheById != null) {
-        log.info("Saving tourist in cache by ID: {}", touristResponseDTO.getId());
-        cacheById.put(touristResponseDTO.getId(), touristResponseDTO);
-      } else {
-        log.warn("Cache not found for ID: {}", REDIS_TOURIST_BY_ID_CACHE_KEY);
-      }
-      if (cacheByNameAndSurname != null) {
-        log.info("Saving tourist in cache by name and surname: {} {}", touristResponseDTO.getName(), touristResponseDTO.getSurname());
-        List tourists = cacheByNameAndSurname.get(REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY, List.class);
-        tourists.add(touristResponseDTO);
-        cacheByNameAndSurname.put(REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY, tourists);
-      } else {
-        log.warn("Cache not found for name and surname: {}", REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY);
-      }
-    } else {
-      log.error("CacheManager is null");
-    }
-  }
-
-  private void onDeleteMethod(String id) {
-    Cache cacheById = redisCacheManager.getCache(REDIS_TOURIST_BY_ID_CACHE_KEY);
-    Cache cacheByEmail = redisCacheManager.getCache(REDIS_TOURIST_BY_EMAIL_CACHE_KEY);
-    Cache cacheByPhone = redisCacheManager.getCache(REDIS_TOURIST_BY_PHONE_CACHE_KEY);
-    Cache allTouristsCache = redisCacheManager.getCache(REDIS_ALL_TOURISTS_CACHE_KEY);
-    Cache cacheByNameAndSurname = redisCacheManager.getCache(REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY);
-    if (cacheById != null) {
-      log.info("Deleting tourist from cache by ID: {}", id);
-      TouristResponseDTO touristResponseDTO = cacheById.get(id, TouristResponseDTO.class);
-      if (touristResponseDTO != null) {
-        cacheById.evict(id);
-        if (cacheByEmail != null) {
-          log.info("Deleting tourist from cache by email: {}", id);
-          cacheByEmail.evict(touristResponseDTO.getEmail());
-        } else {
-          log.warn("Cache not found for email: {}", REDIS_TOURIST_BY_EMAIL_CACHE_KEY);
-        }
-        if (cacheByPhone != null) {
-          log.info("Deleting tourist from cache by phone: {}", id);
-          cacheByPhone.evict(touristResponseDTO.getPhoneNumber());
-        } else {
-          log.warn("Cache not found for phone: {}", REDIS_TOURIST_BY_PHONE_CACHE_KEY);
-        }
-        if (allTouristsCache != null) {
-          log.info("Deleting tourist from all tourists cache");
-          List tourists = allTouristsCache.get(REDIS_ALL_TOURISTS_CACHE_KEY, List.class);
-          tourists.removeIf(tourist -> ((TouristResponseDTO) tourist).getId().equals(id));
-          allTouristsCache.put(REDIS_ALL_TOURISTS_CACHE_KEY, tourists);
-        } else {
-          log.warn("Cache not found for all tourists: {}", REDIS_ALL_TOURISTS_CACHE_KEY);
-        }
-        if (cacheByNameAndSurname != null) {
-          log.info("Deleting tourist from cache by name and surname: {} {}", touristResponseDTO.getName(), touristResponseDTO.getSurname());
-          List tourists = cacheByNameAndSurname.get(REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY, List.class);
-          tourists.removeIf(tourist -> ((TouristResponseDTO) tourist).getId().equals(id));
-          cacheByNameAndSurname.put(REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY, tourists);
-        } else {
-          log.warn("Cache not found for name and surname: {}", REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY);
-        }
-      } else {
-        log.warn("Tourist not found in cache by ID: {}", id);
-      }
-    } else {
-      log.warn("Cache not found for ID: {}", REDIS_TOURIST_BY_ID_CACHE_KEY);
-    }
-  }
-
-  private void onUpdateMethod(TouristResponseDTO touristResponseDTO) {
-    Cache cacheById = redisCacheManager.getCache(REDIS_TOURIST_BY_ID_CACHE_KEY);
-    Cache cacheByEmail = redisCacheManager.getCache(REDIS_TOURIST_BY_EMAIL_CACHE_KEY);
-    Cache cacheByPhone = redisCacheManager.getCache(REDIS_TOURIST_BY_PHONE_CACHE_KEY);
-    Cache allTouristsCache = redisCacheManager.getCache(REDIS_ALL_TOURISTS_CACHE_KEY);
-    Cache cacheByNameAndSurname = redisCacheManager.getCache(REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY);
-    if (cacheById != null) {
-      log.info("Updating tourist in cache by ID: {}", touristResponseDTO.getId());
-      cacheById.put(touristResponseDTO.getId(), touristResponseDTO);
-    } else {
-      log.warn("Cache not found for ID: {}", REDIS_TOURIST_BY_ID_CACHE_KEY);
-    }
-    if (cacheByEmail != null) {
-      log.info("Updating tourist in cache by email: {}", touristResponseDTO.getEmail());
-      cacheByEmail.put(touristResponseDTO.getEmail(), touristResponseDTO);
-    } else {
-      log.warn("Cache not found for email: {}", REDIS_TOURIST_BY_EMAIL_CACHE_KEY);
-    }
-    if (cacheByPhone != null) {
-      log.info("Updating tourist in cache by phone: {}", touristResponseDTO.getPhoneNumber());
-      cacheByPhone.put(touristResponseDTO.getPhoneNumber(), touristResponseDTO);
-    } else {
-      log.warn("Cache not found for phone: {}", REDIS_TOURIST_BY_PHONE_CACHE_KEY);
-    }
-    if (allTouristsCache != null) {
-      log.info("Updating all tourists cache");
-      List tourists = allTouristsCache.get(REDIS_ALL_TOURISTS_CACHE_KEY, List.class);
-      tourists.removeIf(tourist -> ((TouristResponseDTO) tourist).getId().equals(touristResponseDTO.getId()));
-      tourists.add(touristResponseDTO);
-      allTouristsCache.put(REDIS_ALL_TOURISTS_CACHE_KEY, tourists);
-    } else {
-      log.warn("Cache not found for all tourists: {}", REDIS_ALL_TOURISTS_CACHE_KEY);
-    }
-    if (cacheByNameAndSurname != null) {
-      log.info("Updating tourist in cache by name and surname: {} {}", touristResponseDTO.getName(), touristResponseDTO.getSurname());
-      List tourists = cacheByNameAndSurname.get(REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY, List.class);
-      tourists.removeIf(tourist -> ((TouristResponseDTO) tourist).getId().equals(touristResponseDTO.getId()));
-      tourists.add(touristResponseDTO);
-      cacheByNameAndSurname.put(REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY, tourists);
-    } else {
-      log.warn("Cache not found for name and surname: {}", REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY);
-    }
-  }
-
   public void updateTourist(String id, TouristRequestDTO touristRequestDTO) throws Exception {
     try {
       log.info("Sending update request for tourist with ID: {} and data: {}", id, touristRequestDTO);
-      rabbitTemplate.convertAndSend(RabbitMQConfig.directExchangeName, RabbitMQConfig.touristPutRequestQueueRoutingKey, touristRequestDTO);
+      TouristServiceOuterClass.Tourist touristProto = TouristServiceOuterClass.Tourist.newBuilder()
+              .setId(id)
+              .setEmail(touristRequestDTO.getEmail())
+              .setCountry(touristRequestDTO.getCountry())
+              .setName(touristRequestDTO.getName())
+              .setSurname(touristRequestDTO.getSurname())
+              .setPhoneNumber(touristRequestDTO.getPhoneNumber())
+              .build();
+      Message message = toProtobufMessage(touristProto);
+      rabbitTemplate.convertAndSend(RabbitMQConfig.directExchangeName, RabbitMQConfig.touristPutRequestQueueRoutingKey, message);
       log.info("Tourist update request successfully sent to RabbitMQ");
     } catch (AmqpException e) {
       log.error("Error while sending update request for tourist with ID: {}", id, e);
@@ -264,6 +190,13 @@ public class TouristService {
       log.error("Unexpected error while updating tourist with ID: {}", id, e);
       throw e;
     }
+  }
+
+  private Message toProtobufMessage(com.google.protobuf.Message protoMessage) {
+    byte[] payload = protoMessage.toByteArray();
+    MessageProperties properties = new MessageProperties();
+    properties.setContentType("application/x-protobuf");
+    return new Message(payload, properties);
   }
 
   public void deleteTourist(String id) throws Exception {
@@ -283,20 +216,158 @@ public class TouristService {
   }
 
   @RabbitListener(queues = {RabbitMQConfig.touristPostResponseQueueName})
-  private void onPostResponseMessage(TouristResponseDTO touristResponseDTO) {
-    log.info("Received response message for POST request: {}", touristResponseDTO);
-    onSaveMethod(touristResponseDTO);
+  private void onPostResponseMessage(byte[] message) {
+    TouristServiceOuterClass.Tourist tourist;
+    try {
+      tourist = TouristServiceOuterClass.Tourist.parseFrom(message);
+      log.info("Received and deserialized tourist object from POST: {}", tourist);
+      TouristResponseDTO touristResponseDTO = mapToTourist(tourist);
+      log.info("Received response message for POST request: {}", touristResponseDTO);
+      onSaveMethod(touristResponseDTO);
+    } catch (InvalidProtocolBufferException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @RabbitListener(queues = {RabbitMQConfig.touristPutResponseQueueName})
-  private void onPutResponseMessage(TouristResponseDTO touristResponseDTO) {
-    log.info("Received response message for PUT request: {}", touristResponseDTO);
-    onUpdateMethod(touristResponseDTO);
+  private void onPutResponseMessage(byte[] message) {
+    TouristServiceOuterClass.Tourist tourist;
+    try {
+      tourist = TouristServiceOuterClass.Tourist.parseFrom(message);
+      log.info("Received and deserialized tourist object from PUT: {}", tourist);
+      TouristResponseDTO touristResponseDTO = mapToTourist(tourist);
+      log.info("Received response message for PUT request: {}", touristResponseDTO);
+      onUpdateMethod(touristResponseDTO);
+    } catch (InvalidProtocolBufferException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @RabbitListener(queues = {RabbitMQConfig.touristDeleteResponseQueueName})
-  private void onDeleteResponseMessage(String id) {
-    log.info("Received response message for DELETE request: {}", id);
-    onDeleteMethod(id);
+  private void onDeleteResponseMessage(byte[] message) {
+    TouristServiceOuterClass.Tourist tourist;
+    try {
+      tourist = TouristServiceOuterClass.Tourist.parseFrom(message);
+      log.info("Received and deserialized tourist object from DELETE: {}", tourist);
+      TouristResponseDTO touristResponseDTO = mapToTourist(tourist);
+      log.info("Received response message for DELETE request: {}", touristResponseDTO);
+      onDeleteMethod(touristResponseDTO);
+    } catch (InvalidProtocolBufferException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void onSaveMethod(TouristResponseDTO touristResponseDTO) {
+    log.info("Saving tourist: {}", touristResponseDTO);
+    Cache cache = cacheManager.getCache(REDIS_ALL_TOURISTS_CACHE_KEY);
+    if (cache != null) {
+      List<TouristResponseDTO> tourists = cache.get(REDIS_ALL_TOURISTS_CACHE_KEY, List.class);
+      if (tourists == null) {
+        tourists = new ArrayList<>();
+      }
+      tourists.add(touristResponseDTO);
+      cache.put(REDIS_ALL_TOURISTS_CACHE_KEY, tourists);
+      log.debug("Added tourist to cache with key: {}", REDIS_ALL_TOURISTS_CACHE_KEY);
+    }
+
+    Cache cacheByNameAndSurname = cacheManager.getCache(REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY);
+    if (cacheByNameAndSurname != null) {
+      String cacheKey = touristResponseDTO.getName() + "-" + touristResponseDTO.getSurname();
+      List<TouristResponseDTO> tourists = cacheByNameAndSurname.get(cacheKey, List.class);
+      if (tourists == null) {
+        tourists = new ArrayList<>();
+      }
+      tourists.add(touristResponseDTO);
+      cacheByNameAndSurname.put(cacheKey, tourists);
+      log.debug("Added tourist to cache with key: {}", cacheKey);
+    }
+  }
+
+  private void onDeleteMethod(TouristResponseDTO touristResponseDTO) {
+    String id = touristResponseDTO.getId();
+    log.info("Deleting tourist with ID: {}", id);
+    Cache cache = cacheManager.getCache(REDIS_ALL_TOURISTS_CACHE_KEY);
+    if (cache != null) {
+      List<TouristResponseDTO> tourists = cache.get(REDIS_ALL_TOURISTS_CACHE_KEY, List.class);
+      if (tourists != null) {
+        tourists.removeIf(tourist -> tourist.getId().equals(id));
+        cache.put(REDIS_ALL_TOURISTS_CACHE_KEY, tourists);
+        log.debug("Removed tourist from cache with key: {}", REDIS_ALL_TOURISTS_CACHE_KEY);
+      }
+    }
+
+    Cache cacheById = cacheManager.getCache(REDIS_TOURIST_BY_ID_CACHE_KEY);
+    if (cacheById != null) {
+      cacheById.evict(id);
+      log.debug("Evicted tourist from cache with key: {}", REDIS_TOURIST_BY_ID_CACHE_KEY);
+    }
+
+    Cache cacheByEmail = cacheManager.getCache(REDIS_TOURIST_BY_EMAIL_CACHE_KEY);
+    if (cacheByEmail != null) {
+      cacheByEmail.evict(touristResponseDTO.getEmail());
+      log.debug("Evicted tourist from cache with key: {}", REDIS_TOURIST_BY_EMAIL_CACHE_KEY);
+    }
+
+    Cache cacheByPhone = cacheManager.getCache(REDIS_TOURIST_BY_PHONE_CACHE_KEY);
+    if (cacheByPhone != null) {
+      cacheByPhone.evict(touristResponseDTO.getPhoneNumber());
+      log.debug("Evicted tourist from cache with key: {}", REDIS_TOURIST_BY_PHONE_CACHE_KEY);
+    }
+
+    Cache cacheByNameAndSurname = cacheManager.getCache(REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY);
+    if (cacheByNameAndSurname != null) {
+      String cacheKey = touristResponseDTO.getName() + "-" + touristResponseDTO.getSurname();
+      List<TouristResponseDTO> tourists = cacheByNameAndSurname.get(cacheKey, List.class);
+      if (tourists != null) {
+        tourists.removeIf(tourist -> tourist.getId().equals(id));
+        cacheByNameAndSurname.put(cacheKey, tourists);
+        log.debug("Updated cache for key: {}", cacheKey);
+      }
+    }
+  }
+
+  private void onUpdateMethod(TouristResponseDTO touristResponseDTO) {
+    log.info("Updating tourist: {}", touristResponseDTO);
+    Cache cacheById = cacheManager.getCache(REDIS_TOURIST_BY_ID_CACHE_KEY);
+    if (cacheById != null) {
+      cacheById.put(touristResponseDTO.getId(), touristResponseDTO);
+      log.debug("Updated cache for ID: {}", touristResponseDTO.getId());
+    }
+
+    Cache cacheByEmail = cacheManager.getCache(REDIS_TOURIST_BY_EMAIL_CACHE_KEY);
+    if (cacheByEmail != null) {
+      cacheByEmail.put(touristResponseDTO.getEmail(), touristResponseDTO);
+      log.debug("Updated cache for email: {}", touristResponseDTO.getEmail());
+    }
+
+    Cache cacheByPhone = cacheManager.getCache(REDIS_TOURIST_BY_PHONE_CACHE_KEY);
+    if (cacheByPhone != null) {
+      cacheByPhone.put(touristResponseDTO.getPhoneNumber(), touristResponseDTO);
+      log.debug("Updated cache for phone: {}", touristResponseDTO.getPhoneNumber());
+    }
+
+    Cache cacheByNameAndSurname = cacheManager.getCache(REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY);
+    if (cacheByNameAndSurname != null) {
+      String cacheKey = touristResponseDTO.getName() + "-" + touristResponseDTO.getSurname();
+      List<TouristResponseDTO> tourists = cacheByNameAndSurname.get(cacheKey, List.class);
+      if (tourists != null) {
+        tourists.removeIf(tourist -> tourist.getId().equals(touristResponseDTO.getId()));
+        tourists.add(touristResponseDTO);
+        cacheByNameAndSurname.put(cacheKey, tourists);
+        log.debug("Updated cache for key: {}", cacheKey);
+      }
+    }
+  }
+
+  private TouristResponseDTO mapToTourist(TouristServiceOuterClass.Tourist tourist) {
+    String id = tourist.getId().isEmpty() ? UUID.randomUUID().toString() : tourist.getId();
+    return TouristResponseDTO.builder()
+            .id(id)
+            .email(tourist.getEmail())
+            .name(tourist.getName())
+            .surname(tourist.getSurname())
+            .phoneNumber(tourist.getPhoneNumber())
+            .country(tourist.getCountry())
+            .build();
   }
 }

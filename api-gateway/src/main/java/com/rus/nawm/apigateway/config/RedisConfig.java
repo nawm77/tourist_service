@@ -1,10 +1,8 @@
 package com.rus.nawm.apigateway.config;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Scope;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
@@ -15,11 +13,11 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 import java.time.Duration;
 
 @Configuration
-@EnableCaching
 public class RedisConfig {
-  @Value("${redis.host}")
+  @Value("${spring.data.redis.host}")
   private String redisHost;
-  @Value("${redis.port}")
+
+  @Value("${spring.data.redis.port}")
   private int redisPort;
 
   public static final String REDIS_ALL_TOURISTS_CACHE_KEY = "allTourists";
@@ -30,15 +28,20 @@ public class RedisConfig {
 
   @Bean
   public LettuceConnectionFactory redisConnectionFactory() {
+    if (redisHost == null || redisHost.isBlank() || redisPort <= 0) {
+      throw new IllegalStateException("Redis configuration is invalid. Check 'spring.data.redis.host' and 'spring.data.redis.port'.");
+    }
     RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration(redisHost, redisPort);
     return new LettuceConnectionFactory(configuration);
   }
 
-  @Bean("myCacheManager")
-  @Scope("singleton")
-  public RedisCacheManager cacheManager() {
-    RedisCacheConfiguration cacheConfig = myDefaultCacheConfig(Duration.ofMinutes(10)).disableCachingNullValues();
-    RedisCacheManager manager = RedisCacheManager.builder(redisConnectionFactory())
+  @Bean
+  public RedisCacheManager cacheManager(LettuceConnectionFactory redisConnectionFactory) {
+    RedisCacheConfiguration cacheConfig = myDefaultCacheConfig(Duration.ofMinutes(10))
+            .disableCachingNullValues();
+
+    return RedisCacheManager.builder(redisConnectionFactory)
+            .cacheDefaults(cacheConfig)
             .cacheDefaults(cacheConfig)
             .withCacheConfiguration(REDIS_TOURIST_BY_NAME_AND_SURNAME_CACHE_KEY, myDefaultCacheConfig(Duration.ofMinutes(10)))
             .withCacheConfiguration(REDIS_TOURIST_BY_PHONE_CACHE_KEY, myDefaultCacheConfig(Duration.ofMinutes(10)))
@@ -46,7 +49,6 @@ public class RedisConfig {
             .withCacheConfiguration(REDIS_TOURIST_BY_ID_CACHE_KEY, myDefaultCacheConfig(Duration.ofMinutes(10)))
             .withCacheConfiguration(REDIS_ALL_TOURISTS_CACHE_KEY, myDefaultCacheConfig(Duration.ofMinutes(10)))
             .build();
-    return manager;
   }
 
   private RedisCacheConfiguration myDefaultCacheConfig(Duration duration) {

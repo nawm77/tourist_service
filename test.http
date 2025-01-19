@@ -26,7 +26,7 @@ GET http://localhost:8080/api/v1/tourist/678aa471a2f7ae20c94a55b9
 ###
 
 ### Get tourist by email
-GET http://localhost:8080/api/v1/tourist/email/john.doe@example.com
+GET http://localhost:8080/api/v1/tourist/email/john.doe@mail.com
 
 ###
 
@@ -56,5 +56,5 @@ Content-Type: application/json
 ###
 
 ### Delete tourist by ID
-DELETE http://localhost:8080/api/v1/tourist/678ab5981cbedb6958494afb
+DELETE http://localhost:8080/api/v1/tourist/6d255644-3103-4d75-91f6-1e9c85d1234f
 # Replace {id} with the actual ID of the tourist you want to delete

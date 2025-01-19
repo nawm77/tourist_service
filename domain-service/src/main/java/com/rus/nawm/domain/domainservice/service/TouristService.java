@@ -8,6 +8,7 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @Service
@@ -19,13 +20,16 @@ public class TouristService {
     this.touristRepository = touristRepository;
   }
 
-  public void deleteTourist(String id) {
+  public Tourist deleteTourist(String id) {
     log.info("Deleting tourist with ID: {}", id);
     try {
+      Tourist t = getTouristById(id).orElseThrow(() -> new NoSuchElementException("No such tourist"));
       touristRepository.deleteById(id);
       log.info("Tourist with ID: {} successfully deleted", id);
+      return t;
     } catch (Exception e) {
       log.error("Error while deleting tourist with ID: {}", id, e);
+      throw e;
     }
   }
 
