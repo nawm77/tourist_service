@@ -1,6 +1,6 @@
 ### Create a new tourist
 
-POST http://localhost:8080/api/v1/tourist
+POST http://{{serverUrl}}:8080/api/v1/tourist
 Content-Type: application/json
 
 {
@@ -15,33 +15,33 @@ Content-Type: application/json
 ###
 
 ### Get all tourists
-GET http://localhost:8080/api/v1/tourist/all
+GET http://{{serverUrl}}:8080/api/v1/tourist/all
 
 ###
 
 ### Get tourist by ID
-GET http://localhost:8080/api/v1/tourist/678aa471a2f7ae20c94a55b9
+GET http://{{serverUrl}}:8080/api/v1/tourist/678d0a83c419c90979e9c7af
 # Replace {id} with the actual ID of the tourist you want to retrieve
 
 ###
 
 ### Get tourist by email
-GET http://localhost:8080/api/v1/tourist/email/john.doe@mail.com
+GET http://{{serverUrl}}:8080/api/v1/tourist/email/john.smith@example.com
 
 ###
 
 ### Get tourist by phone number
-GET http://localhost:8080/api/v1/tourist/phone/+1234567890
+GET http://{{serverUrl}}:8080/api/v1/tourist/phone/+1234567890
 
 ###
 
 ### Get tourists by name and surname
-GET http://localhost:8080/api/v1/tourist/name/John/surname/Doe
+GET http://{{serverUrl}}:8080/api/v1/tourist/name/John/surname/Smith
 
 ###
 
 ### Update tourist by ID
-PUT http://localhost:8080/api/v1/tourist/678ab5981cbedb6958494afb
+PUT http://{{serverUrl}}:8080/api/v1/tourist/678d0a83c419c90979e9c7af
 Content-Type: application/json
 
 {
@@ -56,5 +56,5 @@ Content-Type: application/json
 ###
 
 ### Delete tourist by ID
-DELETE http://localhost:8080/api/v1/tourist/6d255644-3103-4d75-91f6-1e9c85d1234f
+DELETE http://{{serverUrl}}:8080/api/v1/tourist/678d0a83c419c90979e9c7af
 # Replace {id} with the actual ID of the tourist you want to delete

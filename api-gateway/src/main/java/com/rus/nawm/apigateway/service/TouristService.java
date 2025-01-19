@@ -324,5 +324,16 @@ public class TouristService {
         log.debug("Updated cache for key: {}", cacheKey);
       }
     }
+
+    Cache allTouristsCache = cacheManager.getCache(REDIS_ALL_TOURISTS_CACHE_KEY);
+    if (allTouristsCache != null) {
+      List<TouristResponseDTO> tourists = allTouristsCache.get(REDIS_ALL_TOURISTS_CACHE_KEY, List.class);
+      if (tourists != null) {
+        tourists.removeIf(tourist -> tourist.getId().equals(touristResponseDTO.getId()));
+        tourists.add(touristResponseDTO);
+        allTouristsCache.put(REDIS_ALL_TOURISTS_CACHE_KEY, tourists);
+        log.debug("Update tourist in cache with key: {}", REDIS_ALL_TOURISTS_CACHE_KEY);
+      }
+    }
   }
 }
