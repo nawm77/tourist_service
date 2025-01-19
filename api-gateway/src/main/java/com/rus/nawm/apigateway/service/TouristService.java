@@ -1,6 +1,6 @@
 package com.rus.nawm.apigateway.service;
 
-import com.google.protobuf.InvalidProtocolBufferException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rus.nawm.apigateway.TouristServiceGrpc;
 import com.rus.nawm.apigateway.TouristServiceOuterClass;
 import com.rus.nawm.apigateway.api.dto.TouristRequestDTO;
@@ -10,8 +10,6 @@ import lombok.extern.log4j.Log4j2;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.modelmapper.ModelMapper;
 import org.springframework.amqp.AmqpException;
-import org.springframework.amqp.core.Message;
-import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,20 +17,20 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static com.rus.nawm.apigateway.config.RedisConfig.*;
 
 @Service
 @Log4j2
-//@EnableCaching
 public class TouristService {
 
   private final ModelMapper modelMapper = new ModelMapper();
   private final CacheManager cacheManager;
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
   @GrpcClient("touristService")
   private TouristServiceGrpc.TouristServiceBlockingStub touristServiceGrpc;
@@ -147,14 +145,7 @@ public class TouristService {
   public void saveNewTourist(TouristRequestDTO touristRequestDTO) throws Exception {
     try {
       log.info("Sending new tourist creation request: {}", touristRequestDTO);
-      TouristServiceOuterClass.Tourist touristProto = TouristServiceOuterClass.Tourist.newBuilder()
-              .setEmail(touristRequestDTO.getEmail())
-              .setCountry(touristRequestDTO.getCountry())
-              .setName(touristRequestDTO.getName())
-              .setSurname(touristRequestDTO.getSurname())
-              .setPhoneNumber(touristRequestDTO.getPhoneNumber())
-              .build();
-      Message message = toProtobufMessage(touristProto);
+      byte[] message = objectMapper.writeValueAsBytes(touristRequestDTO);
       rabbitTemplate.convertAndSend(RabbitMQConfig.directExchangeName, RabbitMQConfig.touristPostRequestQueueRoutingKey, message);
       log.info("Tourist creation request successfully sent to RabbitMQ");
     } catch (AmqpException e) {
@@ -169,15 +160,7 @@ public class TouristService {
   public void updateTourist(String id, TouristRequestDTO touristRequestDTO) throws Exception {
     try {
       log.info("Sending update request for tourist with ID: {} and data: {}", id, touristRequestDTO);
-      TouristServiceOuterClass.Tourist touristProto = TouristServiceOuterClass.Tourist.newBuilder()
-              .setId(id)
-              .setEmail(touristRequestDTO.getEmail())
-              .setCountry(touristRequestDTO.getCountry())
-              .setName(touristRequestDTO.getName())
-              .setSurname(touristRequestDTO.getSurname())
-              .setPhoneNumber(touristRequestDTO.getPhoneNumber())
-              .build();
-      Message message = toProtobufMessage(touristProto);
+      byte[] message = objectMapper.writeValueAsBytes(touristRequestDTO);
       rabbitTemplate.convertAndSend(RabbitMQConfig.directExchangeName, RabbitMQConfig.touristPutRequestQueueRoutingKey, message);
       log.info("Tourist update request successfully sent to RabbitMQ");
     } catch (AmqpException e) {
@@ -192,17 +175,10 @@ public class TouristService {
     }
   }
 
-  private Message toProtobufMessage(com.google.protobuf.Message protoMessage) {
-    byte[] payload = protoMessage.toByteArray();
-    MessageProperties properties = new MessageProperties();
-    properties.setContentType("application/x-protobuf");
-    return new Message(payload, properties);
-  }
-
   public void deleteTourist(String id) throws Exception {
     try {
       log.info("Sending delete request for tourist with ID: {}", id);
-      rabbitTemplate.convertAndSend(RabbitMQConfig.directExchangeName, RabbitMQConfig.touristDeleteRequestQueueRoutingKey, id);
+      rabbitTemplate.convertAndSend(RabbitMQConfig.directExchangeName, RabbitMQConfig.touristDeleteRequestQueueRoutingKey, id.getBytes());
     } catch (AmqpException e) {
       log.error("Error while sending delete request for tourist with ID: {}", id, e);
       throw e;
@@ -217,42 +193,33 @@ public class TouristService {
 
   @RabbitListener(queues = {RabbitMQConfig.touristPostResponseQueueName})
   private void onPostResponseMessage(byte[] message) {
-    TouristServiceOuterClass.Tourist tourist;
     try {
-      tourist = TouristServiceOuterClass.Tourist.parseFrom(message);
-      log.info("Received and deserialized tourist object from POST: {}", tourist);
-      TouristResponseDTO touristResponseDTO = mapToTourist(tourist);
+      TouristResponseDTO touristResponseDTO = objectMapper.readValue(message, TouristResponseDTO.class);
       log.info("Received response message for POST request: {}", touristResponseDTO);
       onSaveMethod(touristResponseDTO);
-    } catch (InvalidProtocolBufferException e) {
+    } catch (IOException e) {
       throw new RuntimeException(e);
     }
   }
 
   @RabbitListener(queues = {RabbitMQConfig.touristPutResponseQueueName})
   private void onPutResponseMessage(byte[] message) {
-    TouristServiceOuterClass.Tourist tourist;
     try {
-      tourist = TouristServiceOuterClass.Tourist.parseFrom(message);
-      log.info("Received and deserialized tourist object from PUT: {}", tourist);
-      TouristResponseDTO touristResponseDTO = mapToTourist(tourist);
+      TouristResponseDTO touristResponseDTO = objectMapper.readValue(message, TouristResponseDTO.class);
       log.info("Received response message for PUT request: {}", touristResponseDTO);
       onUpdateMethod(touristResponseDTO);
-    } catch (InvalidProtocolBufferException e) {
+    } catch (IOException e) {
       throw new RuntimeException(e);
     }
   }
 
   @RabbitListener(queues = {RabbitMQConfig.touristDeleteResponseQueueName})
   private void onDeleteResponseMessage(byte[] message) {
-    TouristServiceOuterClass.Tourist tourist;
     try {
-      tourist = TouristServiceOuterClass.Tourist.parseFrom(message);
-      log.info("Received and deserialized tourist object from DELETE: {}", tourist);
-      TouristResponseDTO touristResponseDTO = mapToTourist(tourist);
+      TouristResponseDTO touristResponseDTO = objectMapper.readValue(message, TouristResponseDTO.class);
       log.info("Received response message for DELETE request: {}", touristResponseDTO);
       onDeleteMethod(touristResponseDTO);
-    } catch (InvalidProtocolBufferException e) {
+    } catch (IOException e) {
       throw new RuntimeException(e);
     }
   }
@@ -357,17 +324,5 @@ public class TouristService {
         log.debug("Updated cache for key: {}", cacheKey);
       }
     }
-  }
-
-  private TouristResponseDTO mapToTourist(TouristServiceOuterClass.Tourist tourist) {
-    String id = tourist.getId().isEmpty() ? UUID.randomUUID().toString() : tourist.getId();
-    return TouristResponseDTO.builder()
-            .id(id)
-            .email(tourist.getEmail())
-            .name(tourist.getName())
-            .surname(tourist.getSurname())
-            .phoneNumber(tourist.getPhoneNumber())
-            .country(tourist.getCountry())
-            .build();
   }
 }
