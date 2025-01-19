@@ -5,5 +5,6 @@ COPY pom.xml pom.xml
 RUN mvn clean package
 FROM bellsoft/liberica-openjdk-alpine-musl
 WORKDIR /app
+RUN apk add --no-cache curl
 COPY --from=builder /build/target/tourist-api-gateway.jar .
 CMD java -jar tourist-api-gateway.jar
